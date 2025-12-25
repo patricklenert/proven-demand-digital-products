@@ -1,0 +1,10 @@
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+sqlmodel==0.0.22
+psycopg2-binary==2.9.10
+crawl4ai==0.4.246
+python-dotenv==1.0.1
+pydantic-settings==2.7.0
+notion-client==2.2.1
+celery==5.4.0
+redis==5.0.1
