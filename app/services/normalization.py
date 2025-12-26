@@ -50,7 +50,7 @@ def normalize_metrics_for_week(
     Args:
         session: Database session
         platform: Platform identifier (etsy, gumroad, whop, reddit)
-        metric_type: Either 'demand' or 'supply'
+        metric_type: One of 'DEMAND', 'SUPPLY', 'QUALITY', 'PRICE'
         week_start: Week identifier
         
     Returns:
@@ -102,7 +102,7 @@ def normalize_all_metrics_for_week(session: Session, week_start: date) -> int:
     operation, maintaining consistency across all cohorts.
     """
     platforms = ["etsy", "gumroad", "whop", "reddit"]
-    metric_types = ["demand", "supply"]
+    metric_types = ["DEMAND", "SUPPLY", "QUALITY", "PRICE"]
     
     total_normalized = 0
     

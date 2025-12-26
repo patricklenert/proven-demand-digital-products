@@ -8,8 +8,10 @@ from fastapi import APIRouter, Depends, Query
 from sqlmodel import Session, select
 from app.database import get_session
 from app.models.gap_scores import GapScore
+from app.models.marketplace_metrics import MarketplaceMetrics, MetricType
 from app.models.summary import SummaryResponse, SummaryOpportunity
 from app.services.notion import NotionService
+from sqlmodel import select
 
 
 router = APIRouter(tags=["reports"])
@@ -21,6 +23,18 @@ def get_current_week_start() -> date:
     days_since_monday = today.weekday()
     week_start = today - timedelta(days=days_since_monday)
     return week_start
+
+
+def get_metric_avg(session: Session, category: str, platform: str, week_start: date, metric_type: MetricType) -> float:
+    """Get average normalized value for a specific metric."""
+    stmt = select(MarketplaceMetrics.normalized_value).where(
+        MarketplaceMetrics.category == category,
+        MarketplaceMetrics.platform == platform,
+        MarketplaceMetrics.week_start == week_start,
+        MarketplaceMetrics.metric_type == metric_type
+    )
+    result = session.exec(stmt).first()
+    return result or 0.0
 
 
 @router.get("/summary", response_model=SummaryResponse)
@@ -58,15 +72,26 @@ async def get_summary(
     ).limit(5)
     
     top_results = session.exec(top_statement).all()
-    top_opportunities = [
-        SummaryOpportunity(
-            category=result.category,
-            platform=result.platform,
-            gap_score=result.gap_score,
-            verdict=result.verdict.value if hasattr(result.verdict, 'value') else result.verdict
+    top_opportunities = []
+    for result in top_results:
+        avg_demand = get_metric_avg(session, result.category, result.platform, week_start, MetricType.DEMAND)
+        avg_supply = get_metric_avg(session, result.category, result.platform, week_start, MetricType.SUPPLY)
+        avg_quality = get_metric_avg(session, result.category, result.platform, week_start, MetricType.QUALITY)
+        avg_price = get_metric_avg(session, result.category, result.platform, week_start, MetricType.PRICE)
+        insight = f"Gap: {result.gap_score:.2f} | D:{avg_demand:.2f} S:{avg_supply:.2f} Q:{avg_quality:.2f} P:{avg_price:.2f}"
+        top_opportunities.append(
+            SummaryOpportunity(
+                category=result.category,
+                platform=result.platform,
+                gap_score=result.gap_score,
+                verdict=result.verdict.value if hasattr(result.verdict, 'value') else result.verdict,
+                avg_demand=avg_demand,
+                avg_supply=avg_supply,
+                avg_quality=avg_quality,
+                avg_price=avg_price,
+                insight=insight
+            )
         )
-        for result in top_results
-    ]
     
     # Get top 5 saturated categories (lowest gap scores)
     saturated_statement = select(GapScore).where(
@@ -76,15 +101,26 @@ async def get_summary(
     ).limit(5)
     
     saturated_results = session.exec(saturated_statement).all()
-    saturated_categories = [
-        SummaryOpportunity(
-            category=result.category,
-            platform=result.platform,
-            gap_score=result.gap_score,
-            verdict=result.verdict.value if hasattr(result.verdict, 'value') else result.verdict
+    saturated_categories = []
+    for result in saturated_results:
+        avg_demand = get_metric_avg(session, result.category, result.platform, week_start, MetricType.DEMAND)
+        avg_supply = get_metric_avg(session, result.category, result.platform, week_start, MetricType.SUPPLY)
+        avg_quality = get_metric_avg(session, result.category, result.platform, week_start, MetricType.QUALITY)
+        avg_price = get_metric_avg(session, result.category, result.platform, week_start, MetricType.PRICE)
+        insight = f"Gap: {result.gap_score:.2f} | D:{avg_demand:.2f} S:{avg_supply:.2f} Q:{avg_quality:.2f} P:{avg_price:.2f}"
+        saturated_categories.append(
+            SummaryOpportunity(
+                category=result.category,
+                platform=result.platform,
+                gap_score=result.gap_score,
+                verdict=result.verdict.value if hasattr(result.verdict, 'value') else result.verdict,
+                avg_demand=avg_demand,
+                avg_supply=avg_supply,
+                avg_quality=avg_quality,
+                avg_price=avg_price,
+                insight=insight
+            )
         )
-        for result in saturated_results
-    ]
     
     return SummaryResponse(
         week_start=str(week_start),
