@@ -65,6 +65,62 @@ def assign_verdict(gap_score: float) -> Literal["high_opportunity", "competitive
         return "saturated"
 
 
+def generate_readable_insight(
+    gap_score: float,
+    demand: float,
+    supply: float,
+    quality: float,
+    price: float
+) -> str:
+    """
+    Generate a human-readable insight string based on market metrics.
+    
+    Args:
+        gap_score: Overall gap score (0-1)
+        demand: Demand score (0-1)
+        supply: Supply score (0-1)
+        quality: Quality score (0-1)
+        price: Price score (0-1)
+        
+    Returns:
+        A descriptive string explaining the market situation.
+    """
+    # 1. Determine the core market dynamic
+    if demand > 0.6 and supply < 0.4:
+        core_msg = "High demand meets low competition."
+    elif demand > 0.6 and supply > 0.6:
+        core_msg = "High demand but intense competition (likely saturated)."
+    elif demand < 0.4 and supply > 0.6:
+        core_msg = "Oversupplied market with low interest."
+    elif demand < 0.4 and supply < 0.4:
+        core_msg = "Low volume niche market."
+    elif demand > supply:
+        core_msg = "Demand slightly outpaces supply."
+    else:
+        core_msg = "Supply slightly outpaces demand."
+
+    # 2. Add nuance based on Quality (if significant)
+    quality_msg = ""
+    if quality > 0.0:  # Only if quality data exists
+        if quality < 0.4:
+            quality_msg = " Existing products have quality issues."
+        elif quality > 0.7:
+            quality_msg = " Strong incumbents with high-quality products."
+
+    # 3. Add nuance based on Price (if significant)
+    price_msg = ""
+    if price > 0.0:  # Only if price data exists
+        if price > 0.7:
+            price_msg = " Premium pricing potential."
+        elif price < 0.3:
+            price_msg = " Price sensitive market (possible discounting)."
+
+    # 4. Combine into final insight
+    full_insight = f"{core_msg}{quality_msg}{price_msg}"
+    
+    return full_insight
+
+
 def compute_gap_score_for_category(
     session: Session,
     category: str,

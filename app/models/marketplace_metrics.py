@@ -9,28 +9,38 @@ from sqlmodel import Field, SQLModel
 
 
 class MetricType(str, Enum):
+    """Core metric types for high-level aggregation."""
     DEMAND = "demand"
     SUPPLY = "supply"
     QUALITY = "quality"
     PRICE = "price"
+
+    # Discount is an additional metric type
+    DISCOUNT = "discount"
 
 
 class MarketplaceMetrics(SQLModel, table=True):
     """
     Stores raw and normalized metrics for demand/supply signals.
     Each record represents a single metric observation for a category+platform+week.
+
+    Metric types can be:
+    - Core: demand, supply, quality, price, discount
+    - Granular: demand.avg_reviews_per_product, supply.bestseller_count, price.min, etc.
+
+    Granular metrics use the format "core_type.detail" for detailed statistics.
     """
     __tablename__ = "marketplace_metrics"
-    
+
     id: Optional[int] = Field(default=None, primary_key=True)
     platform: str = Field(index=True)  # etsy, gumroad, whop, reddit
     category: str = Field(index=True)
-    metric_type: MetricType = Field(index=True)
+    metric_type: str = Field(index=True)  # Changed from Enum to str to support granular metrics
     raw_value: float
     normalized_value: float = Field(ge=0.0, le=1.0)  # Must be between 0 and 1
     week_start: date = Field(index=True)
     created_at: datetime = Field(default_factory=datetime.utcnow)
-    
+
     class Config:
         """Pydantic configuration."""
         json_schema_extra = {
