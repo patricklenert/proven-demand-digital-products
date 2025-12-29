@@ -293,10 +293,8 @@ class EtsyScraper(BaseScraper):
                             logger.info(f"API Response type: {type(result)}")
                             logger.info(f"API Response keys: {list(result.keys()) if isinstance(result, dict) else 'N/A'}")
 
-                            # TODO: Normalize API 2 response to match API 1 format
-                            # API 2 response structure is different - waiting for user to provide response model
-                            # For now, return the raw data and we'll normalize in _normalize_api2_response
-                            data = result.get("data", []) if isinstance(result, dict) else []
+                            # API 2 returns data in "results" array
+                            data = result.get("results", []) if isinstance(result, dict) else []
 
                             if isinstance(data, list):
                                 logger.info(f"SUCCESS: Retrieved {len(data)} products from API 2")
@@ -369,14 +367,16 @@ class EtsyScraper(BaseScraper):
 
         for item in data:
             try:
-                # Parse ratings count (e.g., "890", "3.3k" -> float)
-                num_ratings_str = item.get("num_ratings", "0")
+                # Parse ratings count (e.g., 890, "890", "3.3k" -> float)
+                num_ratings_val = item.get("num_ratings", 0)
                 num_ratings = 0
-                if isinstance(num_ratings_str, str):
-                    if 'k' in num_ratings_str.lower():
-                        num_ratings = float(num_ratings_str.lower().replace('k', '')) * 1000
+                if isinstance(num_ratings_val, (int, float)):
+                    num_ratings = float(num_ratings_val)
+                elif isinstance(num_ratings_val, str):
+                    if 'k' in num_ratings_val.lower():
+                        num_ratings = float(num_ratings_val.lower().replace('k', '')) * 1000
                     else:
-                        num_ratings = float(num_ratings_str) if num_ratings_str else 0
+                        num_ratings = float(num_ratings_val) if num_ratings_val else 0
 
                 # Create reviews string in API 1 format
                 rating_val = item.get("rating", "0")
@@ -385,11 +385,22 @@ class EtsyScraper(BaseScraper):
                 # Determine if bestseller
                 is_bestseller = item.get("badge") == "Bestseller"
 
+                # Helper function to safely extract and clean price values
+                def safe_price(value, default="0"):
+                    if value is None:
+                        return default
+                    return str(value).replace("$", "") if isinstance(value, str) else default
+
+                def safe_discount(value):
+                    if value is None:
+                        return ""
+                    return str(value).replace(" off", "") if isinstance(value, str) else ""
+
                 # Build price object
                 price_obj = {
-                    "salePrice": item.get("discount_price", item.get("original_price", "0")).replace("$", ""),
-                    "originalPrice": item.get("original_price", "0").replace("$", ""),
-                    "discount": item.get("discount_percent", "").replace(" off", "")
+                    "salePrice": safe_price(item.get("discount_price") or item.get("original_price")),
+                    "originalPrice": safe_price(item.get("original_price")),
+                    "discount": safe_discount(item.get("discount_percent"))
                 }
 
                 # Normalize item to API 1 format
