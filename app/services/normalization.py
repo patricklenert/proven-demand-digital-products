@@ -88,29 +88,49 @@ def normalize_metrics_for_week(
 def normalize_all_metrics_for_week(session: Session, week_start: date) -> int:
     """
     Normalize all metrics across all platforms and metric types for a given week.
-    
+
     This is the main entry point called by the Windmill compute pipeline.
-    
+
     Args:
         session: Database session
         week_start: Week identifier
-        
+
     Returns:
         Total number of metrics normalized
-        
+
     Why: This function ensures the entire week's data is normalized in a single
     operation, maintaining consistency across all cohorts.
     """
-    platforms = ["etsy", "gumroad", "whop", "reddit"]
-    metric_types = ["DEMAND", "SUPPLY", "QUALITY", "PRICE"]
-    
+    import logging
+    logger = logging.getLogger(__name__)
+
+    # DEBUG: First check what's in the database for this week
+    all_statement = select(MarketplaceMetrics).where(
+        MarketplaceMetrics.week_start == week_start
+    )
+    all_metrics = session.exec(all_statement).all()
+    logger.info(f"[DEBUG] Total metrics in DB for week {week_start}: {len(all_metrics)}")
+    if all_metrics:
+        logger.info(f"[DEBUG] Sample metrics: {[(m.platform, m.category, m.metric_type) for m in all_metrics[:5]]}")
+
+    if not all_metrics:
+        return 0
+
+    # Extract unique metric_type and platform values from the loaded metrics
+    # This avoids the SQL query issue that only returns first character
+    metric_types = list(set(m.metric_type for m in all_metrics))
+    platforms = list(set(m.platform for m in all_metrics))
+    logger.info(f"[DEBUG] Found metric_types: {metric_types}")
+    logger.info(f"[DEBUG] Found platforms: {platforms}")
+
     total_normalized = 0
-    
+
     for platform in platforms:
         for metric_type in metric_types:
             count = normalize_metrics_for_week(
                 session, platform, metric_type, week_start
             )
+            logger.info(f"[DEBUG] Normalized {count} metrics for {platform}/{metric_type}")
             total_normalized += count
-    
+
     return total_normalized

@@ -87,8 +87,11 @@ class GumroadScraper(BaseScraper):
         """
         Search for products using Crawl4AI with CSS Extraction Strategy.
 
-        Uses CssExtractionStrategy to directly extract structured product data
+        Uses JsonCssExtractionStrategy to directly extract structured product data
         from Gumroad's DOM using CSS selectors.
+
+        Implements multi-step scraping to click "Load more" button multiple times
+        to collect more than the initial 36 products.
 
         Returns list of product items with ratings, rating counts, and prices.
         """
@@ -140,47 +143,96 @@ class GumroadScraper(BaseScraper):
 
         extraction_strategy = JsonCssExtractionStrategy(schema)
 
+        # JavaScript code to find and click the "Load more" button
+        load_more_js = """
+        const buttons = Array.from(document.querySelectorAll('button, a, div[role="button"], [class*="button"]'));
+        const loadMoreBtn = buttons.find(btn => btn.textContent.trim() === 'Load more');
+        if (loadMoreBtn) {
+            loadMoreBtn.click();
+            true;
+        } else {
+            false;
+        }
+        """
+
+        session_id = f"gumroad_{category.replace(' ', '_')}"
+        all_products = []
+        max_clicks = 10  # Konfigurierbar: 10 Klicks für ~400 Produkte
+
         try:
             async with AsyncWebCrawler(verbose=True, headless=True) as crawler:
-                logger.info(f"[DEBUG] Starting crawler with JavaScript enabled...")
+                logger.info(f"[DEBUG] Starting crawler with session: {session_id}")
 
+                # Step 1: Load initial page
+                logger.info(f"[DEBUG] Step 1: Loading initial page...")
                 result = await crawler.arun(
                     url=discover_url,
                     word_count_threshold=10,
                     bypass_cache=True,
                     extraction_strategy=extraction_strategy,
-                    js_code=[
-                        "const sleep = ms => new Promise(r => setTimeout(r, ms));",
-                        "await sleep(3000);",
-                        "window.scrollTo(0, document.body.scrollHeight);",
-                        "await sleep(2000);"
-                    ],
+                    wait_for="css:article",
+                    session_id=session_id,
                     page_timeout=60000,
                 )
 
-                logger.info(f"[DEBUG] Crawl completed. Success: {result.success}")
+                logger.info(f"[DEBUG] Initial crawl completed. Success: {result.success}")
 
-                if not result.success:
-                    logger.error(f"[ERROR] Crawl failed: {result.error_message if hasattr(result, 'error_message') else 'Unknown error'}")
-                    return []
-
-                if result.extracted_content:
-                    logger.info(f"[DEBUG] CSS extraction successful")
-                    logger.info(f"[DEBUG] Extracted content preview: {result.extracted_content[:500]}...")
-
+                if result.success and result.extracted_content:
                     try:
-                        # Parse the extracted JSON
                         extracted_data = json.loads(result.extracted_content)
-                        products = self._process_extracted_data(extracted_data, category)
-                        return products
+                        all_products = self._process_extracted_data(extracted_data, category)
+                        logger.info(f"[DEBUG] Initial load: {len(all_products)} products")
                     except json.JSONDecodeError as e:
                         logger.error(f"[ERROR] Failed to parse extracted JSON: {e}")
-                        logger.error(f"[ERROR] Raw content: {result.extracted_content}")
-                        # Fallback to manual parsing
                         return self._parse_html_fallback(result.html, category)
                 else:
-                    logger.warning(f"[WARNING] No extracted content from CSS strategy, trying fallback...")
+                    logger.warning(f"[WARNING] No extracted content from initial load")
                     return self._parse_html_fallback(result.html, category)
+
+                # Step 2: Click "Load more" multiple times
+                for i in range(max_clicks):
+                    logger.info(f"[DEBUG] Step 2.{i+1}: Clicking 'Load more'...")
+
+                    result = await crawler.arun(
+                        url=discover_url,
+                        word_count_threshold=10,
+                        bypass_cache=True,
+                        extraction_strategy=extraction_strategy,
+                        js_code=[
+                            "window.scrollTo(0, document.body.scrollHeight);",
+                            "await new Promise(r => setTimeout(r, 1000));",
+                            load_more_js,
+                            "await new Promise(r => setTimeout(r, 2000));"
+                        ],
+                        wait_for="css:article",
+                        session_id=session_id,
+                        js_only=True,  # WICHTIG: Keine neue Navigation
+                        page_timeout=60000,
+                    )
+
+                    if result.success and result.extracted_content:
+                        try:
+                            extracted_data = json.loads(result.extracted_content)
+                            new_products = self._process_extracted_data(extracted_data, category)
+                            logger.info(f"[DEBUG] Click {i+1}: Got {len(new_products)} products")
+                            all_products.extend(new_products)
+                        except json.JSONDecodeError as e:
+                            logger.error(f"[ERROR] Failed to parse JSON on click {i+1}: {e}")
+                            continue
+                    else:
+                        logger.warning(f"[DEBUG] Click {i+1}: No new products or button disabled, stopping")
+                        break  # Stop if button no longer works
+
+                # Remove duplicates
+                seen_titles = set()
+                unique_products = []
+                for product in all_products:
+                    if product["title"] not in seen_titles:
+                        seen_titles.add(product["title"])
+                        unique_products.append(product)
+
+                logger.info(f"[DEBUG] Total unique products: {len(unique_products)}")
+                return unique_products
 
         except Exception as e:
             logger.error(f"[ERROR] Exception during crawling: {str(e)}", exc_info=True)

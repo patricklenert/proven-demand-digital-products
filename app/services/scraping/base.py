@@ -60,21 +60,30 @@ class BaseScraper(ABC):
     async def scrape_and_store(self, category: str, week_start: date) -> tuple[int, List[Dict[str, Any]]]:
         """
         Execute scraping and store results in database.
-        
+
         Args:
             category: Product category to scrape
             week_start: Week identifier
-            
+
         Returns:
             Tuple of (number of metrics collected, raw data from platform)
-            
+
         Why: This method provides a standard entrypoint for all scrapers,
         handling the full collection and storage pipeline.
         """
+        import logging
+        logger = logging.getLogger(__name__)
+
         metrics, raw_data = await self.extract_metrics(category, week_start)
-        
-        for metric in metrics:
+
+        logger.info(f"[DEBUG] Storing {len(metrics)} metrics to database for {self.platform_name}/{category}")
+        logger.info(f"[DEBUG] Week start: {week_start} (type: {type(week_start)})")
+
+        for i, metric in enumerate(metrics):
+            logger.info(f"[DEBUG] Metric {i}: platform={metric.platform}, category={metric.category}, metric_type={metric.metric_type}, week_start={metric.week_start}")
             self.session.add(metric)
-        
+
         self.session.commit()
+        logger.info(f"[DEBUG] Commit successful. Stored {len(metrics)} metrics.")
+
         return len(metrics), raw_data
