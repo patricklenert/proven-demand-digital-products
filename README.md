@@ -148,7 +148,7 @@ Trigger scraping for a specific platform and category.
 ```bash
 curl -X POST http://localhost:8000/scrape/etsy \
   -H "Content-Type: application/json" \
-  -d '{"category": "digital planners", "week_start": "2025-12-23"}'
+  -d '{"category": "study planner notion", "week_start": "2025-12-30"}'
 ```
 
 **POST /windmill/compute**
@@ -157,7 +157,7 @@ Trigger full computation pipeline for a week.
 ```bash
 curl -X POST http://localhost:8000/compute \
   -H "Content-Type: application/json" \
-  -d '{"week_start": "2025-12-23"}'
+  -d '{"week_start": "2025-12-30"}'
 ```
 
 ### Report Generation

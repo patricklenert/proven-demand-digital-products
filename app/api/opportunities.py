@@ -24,7 +24,7 @@ class OpportunityItem(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "category": "digital planners",
+                "category": "study planner notion",
                 "platform": "etsy",
                 "gap_score": 0.72,
                 "verdict": "high_opportunity"

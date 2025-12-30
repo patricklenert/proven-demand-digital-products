@@ -33,10 +33,10 @@ class GapScore(SQLModel, table=True):
         """Pydantic configuration."""
         json_schema_extra = {
             "example": {
-                "category": "digital planners",
+                "category": "study planner notion",
                 "platform": "etsy",
                 "gap_score": 0.72,
                 "verdict": "high_opportunity",
-                "week_start": "2025-12-23"
+                "week_start": "2025-12-30"
             }
         }

@@ -22,7 +22,7 @@ class ComputeRequest(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "week_start": "2025-12-23"
+                "week_start": "2025-12-30"
             }
         }
 
@@ -35,8 +35,8 @@ class ScrapeRequest(BaseModel):
     class Config:
         json_schema_extra = {
             "example": {
-                "category": "digital planners",
-                "week_start": "2025-12-23"
+                "category": "study planner notion",
+                "week_start": "2025-12-30"
             }
         }
 

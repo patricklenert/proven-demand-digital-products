@@ -33,7 +33,7 @@ class BaseScraper(ABC):
         pass
     
     @abstractmethod
-    async def extract_metrics(self, category: str, week_start: date) -> List[MarketplaceMetrics]:
+    async def extract_metrics(self, category: str, week_start: date) -> tuple[List[MarketplaceMetrics], List[Dict[str, Any]]]:
         """
         Extract raw metrics for a given category and week.
         

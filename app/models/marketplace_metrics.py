@@ -46,10 +46,10 @@ class MarketplaceMetrics(SQLModel, table=True):
         json_schema_extra = {
             "example": {
                 "platform": "etsy",
-                "category": "digital planners",
+                "category": "study planner notion",
                 "metric_type": "demand",
                 "raw_value": 15000.0,
                 "normalized_value": 0.75,
-                "week_start": "2025-12-23"
+                "week_start": "2025-12-30"
             }
         }
